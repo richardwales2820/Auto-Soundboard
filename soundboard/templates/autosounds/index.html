@@ -1,0 +1,9 @@
+<form action="/autosounds/" method="POST" class="form" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input id="fileupload" name="myfile" type="file" />
+    <input type="submit" value="submit" id="submit" />
+</form>
+
+{% for word in unique_words %}
+{{ word }}
+{% endfor %}

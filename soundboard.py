@@ -2,9 +2,12 @@ import speech_recognition as sr
 import base64
 import json
 import config
+import sys
+import winsound
+from pydub import AudioSegment
 from os import path
-from urllib import urlencode
-from urllib2 import Request, HTTPError, URLError, urlopen
+from urllib.parse import urlencode
+from urllib.request import Request, HTTPError, URLError, urlopen
 
 # With help from "https://stackoverflow.com/questions/36458214/split-speech-audio-file-on-words-in-python"
 def extracted_from_sr_recognize_ibm(audio_data, username="IBM_USERNAME", password="IBM_PASSWORD", language="en-US", show_all=False, timestamps=True,
@@ -46,19 +49,52 @@ def extracted_from_sr_recognize_ibm(audio_data, username="IBM_USERNAME", passwor
             if "transcript" in hypothesis:
                 print(hypothesis['timestamps'])
                 transcription.append(hypothesis["transcript"])
-    return "\n".join(transcription)
+    return "\n".join(transcription),hypothesis['timestamps']
 
-AUDIO_FILE = path.join(path.dirname(path.realpath(__file__)), "test.wav")
-IBM_USERNAME = config.username
-IBM_PASSWORD = config.password
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Incorrect syntax")
+        quit()
+    print(sys.argv)
 
-r = sr.Recognizer()
-with sr.AudioFile(AUDIO_FILE) as source:
-    audio = r.record(source)  # read the entire audio file
+    AUDIO_FILE = path.join(path.dirname(path.realpath(__file__)), sys.argv[1])
+    IBM_USERNAME = config.username
+    IBM_PASSWORD = config.password
 
-try:
-    print("IBM Speech to Text thinks you said " + extracted_from_sr_recognize_ibm(audio, username=IBM_USERNAME, password=IBM_PASSWORD))
-except sr.UnknownValueError:
-    print("IBM Speech to Text could not understand audio")
-except sr.RequestError as e:
-    print("Could not request results from IBM Speech to Text service; {0}".format(e))
+    r = sr.Recognizer()
+    with sr.AudioFile(AUDIO_FILE) as source:
+        audio = r.record(source)  # read the entire audio file
+
+    try:
+        transcript,timestamps = extracted_from_sr_recognize_ibm(audio, username=IBM_USERNAME, password=IBM_PASSWORD)
+    except sr.UnknownValueError:
+        print("IBM Speech to Text could not understand audio")
+    except sr.RequestError as e:
+        print("Could not request results from IBM Speech to Text service; {0}".format(e))
+
+    sound = AudioSegment.from_wav(AUDIO_FILE)
+
+    seen_words = {}
+
+    for utterance in timestamps:
+        word,start,end = utterance
+        if word not in seen_words or len(seen_words[word]) < (float(end) - float(start)):
+            seen_words[word] = sound[float(start) * 1000 : float(end) * 1000]
+
+    while True:
+        print("Possible keys: {}".format(seen_words.keys()))
+        command = input('Enter string to build or q to quit\n\n')
+        final_clip = sound[0:0]
+
+        if command == 'q':
+            quit()
+
+        words = command.split(' ')
+        for word in words:
+            if word in seen_words:
+                final_clip += seen_words[word]
+        final_clip.export('final.wav', format='wav')
+        winsound.PlaySound('final.wav', winsound.SND_FILENAME)
+
+    clip = seen_words['we'] + seen_words['have'] + seen_words['the'] + seen_words['wall']
+    clip.export("final.wav", format="wav")

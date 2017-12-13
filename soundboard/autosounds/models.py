@@ -4,6 +4,7 @@ from django.db import models
 # user's browsing session
 class SoundboardFile(models.Model):
     session_id = models.CharField(max_length=128)
+    timestamp = models.DateTimeField()
     uploaded_file = models.FileField()
 
 # Associates a word and timestamp range with a SoundboardFile model object
